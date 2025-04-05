@@ -50,14 +50,14 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Generate', // Changed title
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="sparkles" color={color} />, // Changed icon
+          tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="sparkles" color={color} />, // Changed icon
         }}
       />
       <Tabs.Screen
         name="mytopics"
         options={{
           title: 'Backlog', // Changed title
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.bullet" color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="list.bullet" color={color} />,
         }}
       />
     </Tabs>

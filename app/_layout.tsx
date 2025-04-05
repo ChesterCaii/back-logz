@@ -37,6 +37,31 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
+        {/* Modal Screens */}
+        <Stack.Screen 
+          name="(modals)/add-topic" 
+          options={{ 
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }} 
+        />
+        <Stack.Screen 
+          name="(modals)/view-notes" 
+          options={{ 
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }} 
+        />
+        <Stack.Screen 
+          name="(modals)/add-note" 
+          options={{ 
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }} 
+        />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
