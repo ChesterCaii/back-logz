@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
+import { useRouter } from 'expo-router';
 
 const ASYNC_STORAGE_TOPICS_KEY = '@BacklogzApp:topics';
 
@@ -42,6 +43,7 @@ export default function MyTopicsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [newTopic, setNewTopic] = useState('');
+  const router = useRouter();
 
   const loadTopics = useCallback(async () => {
     console.log('Loading topics...');
@@ -131,19 +133,29 @@ export default function MyTopicsScreen() {
     );
   };
 
+  const handlePlaySpecificTopic = (topic: string) => {
+      console.log("Navigating to play:", topic);
+      router.push({ pathname: '/', params: { topicToPlay: topic } });
+  }
+
   const renderTopicItem = ({ item }: { item: string }) => (
-    <View style={styles.topicItemContainer}>
-      <Text style={styles.topicText}>{item}</Text>
-      <TouchableOpacity 
-        onPress={() => {
-            console.log(`Delete TouchableOpacity onPress fired for: ${item}`); 
-            handleDeleteTopic(item);
-        }}
-        style={styles.deleteButton}
-      >
-        <Ionicons name="trash-bin-outline" size={24} color={theme.error} />
-      </TouchableOpacity>
-    </View>
+    <TouchableOpacity 
+      style={styles.topicItemContainer} 
+      onPress={() => handlePlaySpecificTopic(item)}
+      activeOpacity={0.7}
+    >
+        <Text style={styles.topicText}>{item}</Text>
+        <TouchableOpacity 
+          onPress={(e) => {
+              e.stopPropagation();
+              console.log(`Delete TouchableOpacity onPress fired for: ${item}`); 
+              handleDeleteTopic(item);
+          }}
+          style={styles.deleteButton}
+        >
+          <Ionicons name="trash-bin-outline" size={24} color={theme.error} /> 
+        </TouchableOpacity>
+    </TouchableOpacity>
   );
 
   return (
@@ -273,7 +285,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     margin: 16,
     right: 20,
-    bottom: Platform.OS === 'ios' ? 40 : 25,
+    bottom: Platform.select({ ios: 30, android: 20 }),
     backgroundColor: theme.primary,
     width: 60,
     height: 60,

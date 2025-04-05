@@ -15,6 +15,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router'; // To reload topics when tab focused
+import { useLocalSearchParams } from 'expo-router'; // Import hook to get params
 
 // --- API Key & Constants --- 
 const GEMINI_API_KEY = 'YOUR_API_KEY_HERE'; // Placeholder for push
@@ -41,6 +42,7 @@ export default function QuickPlayScreen() { // Renamed component
   const [isLoading, setIsLoading] = useState(false); // Loading state for generation/speech
   const [topics, setTopics] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ topicToPlay?: string }>(); // Get params
 
   // --- Load Topics Function --- 
   const loadTopics = useCallback(async () => {
@@ -56,12 +58,56 @@ export default function QuickPlayScreen() { // Renamed component
     }
   }, []);
 
-  // Reload topics when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      loadTopics();
-    }, [loadTopics])
-  );
+  // --- Play Specific Topic Logic --- 
+  const playSpecificTopic = useCallback(async (topic: string) => {
+      setError(null);
+      Speech.stop();
+      console.log(`Playing specific topic: ${topic}`);
+      console.log('SETTING isLoading = true (playSpecificTopic start)');
+      setIsLoading(true);
+      
+      // Generate Script via Gemini (same logic as random, but with specific topic)
+      const prompt = `Generate a short, engaging podcast script (around 200-300 words) about the topic: "${topic}". The tone should be informative yet conversational. If possible, briefly mention 1-2 credible sources related to the topic within the script. Structure it like a mini-podcast segment.`;
+      try {
+          const response = await axios.post(GEMINI_API_URL, { contents: [{ parts: [{ text: prompt }] }], }, { headers: { 'Content-Type': 'application/json' } });
+          const script = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (script) {
+              const cleanedScript = script.replace(/\*\*[^\*]+\*\*\s*/g, '').trim();
+              if (cleanedScript) {
+                  Speech.speak(cleanedScript, {
+                      onDone: () => {
+                           console.log('SETTING isLoading = false (speech onDone)');
+                           setIsLoading(false);
+                      }, 
+                      onError: (err) => { 
+                          console.error('Speech error:', err);
+                          setError('Failed to play audio for the topic.');
+                          console.log('SETTING isLoading = false (speech onError)');
+                          setIsLoading(false);
+                      }
+                  });
+              } else {
+                  setError('Generated script was empty after cleaning.');
+                  console.log('SETTING isLoading = false (empty cleaned script)');
+                  setIsLoading(false);
+              }
+          } else {
+              console.error('Invalid response structure from Gemini API:', response.data);
+              setError('Failed to parse the generated script.');
+              console.log('SETTING isLoading = false (invalid API response)');
+              setIsLoading(false);
+          }
+      } catch (err: any) { // API Error
+          console.error('Error calling Gemini API for random play:', err);
+          let errorMessage = 'Failed to generate script for the random topic.';
+          if (axios.isAxiosError(err) && err.response) {
+              errorMessage = `API Error (${err.response.status}): ${err.response.data?.error?.message || 'Unknown API error'}`;
+          }
+          setError(errorMessage);
+          console.log('SETTING isLoading = false (API catch block)');
+          setIsLoading(false);
+      }
+  }, []); // Dependencies: none needed directly, uses state/constants
 
   // --- Play Random Logic --- 
   const handlePlayRandom = async () => {
@@ -70,8 +116,6 @@ export default function QuickPlayScreen() { // Renamed component
 
     if (topics.length === 0) {
       setError("Your backlog is empty! Add topics in the Backlog tab first.");
-      // Optionally reload topics here in case they were just added
-      // loadTopics();
       return;
     }
     
@@ -79,56 +123,37 @@ export default function QuickPlayScreen() { // Renamed component
     const randomIndex = Math.floor(Math.random() * topics.length);
     const randomTopic = topics[randomIndex];
     console.log(`Playing random topic: ${randomTopic}`);
-    setIsLoading(true);
     
-    // 2. Generate Script via Gemini
-    const prompt = `Generate a short, engaging podcast script (around 200-300 words) about the topic: "${randomTopic}". The tone should be informative yet conversational. If possible, briefly mention 1-2 credible sources related to the topic within the script. Structure it like a mini-podcast segment.`;
-
-    try {
-      const response = await axios.post(GEMINI_API_URL, {
-        contents: [{ parts: [{ text: prompt }] }],
-      }, { headers: { 'Content-Type': 'application/json' } });
-
-      const script = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (script) {
-        // 3. Clean and Speak Immediately
-        const cleanedScript = script.replace(/\*\*[^\*]+\*\*\s*/g, '').trim();
-        if (cleanedScript) {
-          Speech.speak(cleanedScript, {
-            onDone: () => setIsLoading(false), // Stop loading when speech finishes
-            onError: (err) => {
-                console.error('Speech error:', err);
-                setError('Failed to play audio for the topic.');
-                setIsLoading(false);
-            }
-          });
-          // Note: isLoading remains true WHILE speaking
-        } else {
-          setError('Generated script was empty after cleaning.');
-          setIsLoading(false);
-        }
-      } else {
-        console.error('Invalid response structure from Gemini API:', response.data);
-        setError('Failed to parse the generated script.');
-        setIsLoading(false);
-      }
-    } catch (err: any) { // API Error
-      console.error('Error calling Gemini API for random play:', err);
-      let errorMessage = 'Failed to generate script for the random topic.';
-      if (axios.isAxiosError(err) && err.response) {
-        errorMessage = `API Error (${err.response.status}): ${err.response.data?.error?.message || 'Unknown API error'}`;
-      }
-      setError(errorMessage);
-      setIsLoading(false);
-    }
-    // Note: We don't set isLoading(false) here if speech started, it's handled by onDone/onError
+    playSpecificTopic(randomTopic); // Reuse the specific play logic
   };
-  
+
+  // --- Effect to Play Topic from Params --- 
+  useEffect(() => {
+    // Check if launched with a topic parameter
+    const topicFromParam = params.topicToPlay;
+    if (topicFromParam) {
+        // We need a slight delay or state check to ensure this doesn't fire *every* time
+        // For simplicity now, we play it. Could refine with state.
+        console.log('Received topicToPlay param:', topicFromParam);
+        playSpecificTopic(topicFromParam);
+        // How to clear the param? Navigation state resets usually handle this,
+        // but might need manual clearing if it persists across focuses.
+    }
+  }, [params, playSpecificTopic]); // Depend on params
+
+  // Reload topics when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadTopics();
+    }, [loadTopics])
+  );
+
   // --- Stop Speech --- (if user wants to stop mid-generation/speech)
   const handleStop = () => {
       Speech.stop();
-      setIsLoading(false); // Also stop loading indicator if stopped manually
+      setError(null); 
+      console.log('SETTING isLoading = false (handleStop)');
+      setIsLoading(false); 
   }
 
   // --- Render --- 
