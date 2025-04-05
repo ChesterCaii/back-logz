@@ -139,7 +139,7 @@ export default function QuickPlayScreen() { // Renamed component
         // How to clear the param? Navigation state resets usually handle this,
         // but might need manual clearing if it persists across focuses.
     }
-  }, [params, playSpecificTopic]); // Depend on params
+  }, [params.topicToPlay]); // Depend on params
 
   // Reload topics when screen comes into focus
   useFocusEffect(
