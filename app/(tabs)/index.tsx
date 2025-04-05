@@ -14,15 +14,35 @@ import {
 } from 'react-native';
 import * as Speech from 'expo-speech';
 import axios from 'axios'; // Make sure axios is imported
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import { Ionicons } from '@expo/vector-icons';
 // import { db } from '../../firebase'; // Comment out Firebase import again
 // import { collection, addDoc, serverTimestamp } from "firebase/firestore"; // Comment out Firestore functions again
 
 // --- Replace key with placeholder for pushing --- 
-const GEMINI_API_KEY = 'YOUR_API_KEY_HERE'; 
+const GEMINI_API_KEY = 'AIzaSyBdtbn0RmqhAvDEcQOAxbUod6u0W83CQnU'; 
 // --- --- --- --- --- --- --- --- --- --- ------
 
 // Use a potentially more current/available model name
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+// Define a key for storing topics
+const ASYNC_STORAGE_TOPICS_KEY = '@BacklogzApp:topics';
+
+// Define Dark Theme Colors (should match _layout.tsx)
+const theme = {
+  background: '#121212',
+  card: '#1e1e1e',         
+  text: '#ffffff',          
+  textSecondary: '#b0b0b0', 
+  primary: '#00bcd4',       
+  inactive: '#757575',     
+  border: '#272727',       
+  error: '#cf6679',        
+  success: '#4caf50',
+  warning: '#ffab00',     
+  stop: '#f44336',         
+};
 
 // Firebase is likely initialized in a layout file or _layout.tsx for this template
 // We might not need to import it here directly, but keep firebase.js for config
@@ -74,24 +94,33 @@ export default function PodcastGeneratorScreen() {
 
       if (script) {
         setGeneratedScript(script.trim());
-        setTopic(''); // <-- Clear the input field here
-        // --- Comment out Firestore Add again --- 
-        /* 
+        const currentTopic = topic.trim(); // Get the topic before clearing
+        setTopic(''); // Clear the input field
+
+        // --- Save topic to AsyncStorage --- 
         try {
-          const topicsCol = collection(db, "topics");
-          await addDoc(topicsCol, {
-            name: topic.trim(), // Save the topic name
-            createdAt: serverTimestamp() // Add a timestamp
-          });
-          console.log("Topic saved to Firestore:", topic);
-        } catch (firestoreError) {
-          console.error("Error saving topic to Firestore:", firestoreError);
-          // Optionally notify the user, but maybe not critical for hackathon
-          // setError('Generated script, but failed to save topic to backlog.'); 
+          // 1. Get existing topics
+          const existingTopicsJson = await AsyncStorage.getItem(ASYNC_STORAGE_TOPICS_KEY);
+          let existingTopics: string[] = existingTopicsJson ? JSON.parse(existingTopicsJson) : [];
+          
+          // 2. Add new topic if it doesn't exist (case-insensitive check)
+          if (!existingTopics.some(t => t.toLowerCase() === currentTopic.toLowerCase())) {
+            existingTopics.push(currentTopic);
+            // Optional: Sort topics alphabetically or keep most recent at top/bottom
+            existingTopics.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())); 
+            
+            // 3. Save updated list
+            await AsyncStorage.setItem(ASYNC_STORAGE_TOPICS_KEY, JSON.stringify(existingTopics));
+            console.log("Topic saved to AsyncStorage:", currentTopic);
+          } else {
+            console.log("Topic already exists in AsyncStorage:", currentTopic);
+          }
+        } catch (storageError) {
+          console.error("Error saving topic to AsyncStorage:", storageError);
+          // Non-critical error, maybe show a small warning? For hackathon, console log is fine.
         }
-        */
-        // console.log("Firestore saving temporarily disabled.") // Add log message
-        // --- End Firestore Add ---
+        // --- End AsyncStorage Save ---
+
       } else {
         console.error('Invalid response structure from Gemini API:', response.data);
         setError('Failed to parse the generated script from the API response.');
@@ -113,8 +142,8 @@ export default function PodcastGeneratorScreen() {
 
   const handleSpeak = () => {
     if (generatedScript) {
-      // Clean the script: Remove patterns like **...** and trim whitespace before speaking
-      const cleanedScript = generatedScript.replace(/\*\*.*?\*\*\s*/g, '').trim(); // Use broader regex and trim
+      // More aggressive cleaning: Remove patterns like **anything** and trim
+      const cleanedScript = generatedScript.replace(/\*\*[^\*]+\*\*\s*/g, '').trim(); 
       
       if (cleanedScript) { // Check if anything is left after cleaning
           Speech.speak(cleanedScript, {
@@ -133,171 +162,161 @@ export default function PodcastGeneratorScreen() {
   };
 
   return (
-    // Removed SafeAreaView and KeyboardAvoidingView - assuming handled by layout
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <Text style={styles.title}>Backlogz Podcast Generator</Text>
+    <ScrollView 
+      contentContainerStyle={styles.scrollContainer} 
+      keyboardShouldPersistTaps="handled"
+      style={{backgroundColor: theme.background}} // Set background on ScrollView itself
+    >
+      <Text style={styles.title}>Backlogz</Text> // Simplified Title
 
       <TextInput
         style={styles.input}
-        placeholder="Enter a topic (e.g., 'Quantum Computing')"
-        placeholderTextColor="#999"
+        placeholder="Enter topic to generate podcast..."
+        placeholderTextColor={theme.textSecondary} 
         value={topic}
         onChangeText={setTopic}
         editable={!isLoading}
+        keyboardAppearance="dark" // Use dark keyboard
       />
 
+      {/* Generate Button */}
       <TouchableOpacity 
-        style={[styles.button, (isLoading || !GEMINI_API_KEY) && styles.buttonDisabled]}
+        style={[styles.button, styles.generateButton, (isLoading || !GEMINI_API_KEY) && styles.buttonDisabled]}
         onPress={handleGeneratePodcast}
         disabled={isLoading || !GEMINI_API_KEY}
       >
-        <Text style={styles.buttonText}>{isLoading ? 'Generating...' : 'Generate Podcast Script'}</Text>
+        {isLoading ? (
+          <ActivityIndicator size="small" color={theme.text} />
+        ) : (
+          <Text style={styles.buttonText}>Generate Script</Text>
+        )}
       </TouchableOpacity>
 
       {!GEMINI_API_KEY && <Text style={styles.warningText}>API Key Needed!</Text>}
 
-      {isLoading && (
-        <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
-      )}
+      {/* Use a simpler loading indicator text */}
+      {isLoading && <Text style={styles.loadingText}>Generating...</Text>}
 
       {error && <Text style={styles.errorText}>{error}</Text>}
 
-      {generatedScript ? (
-        <View style={styles.scriptContainer}>
-          <Text style={styles.scriptTitle}>Generated Script:</Text>
-          <Text style={styles.scriptText}>{generatedScript}</Text>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity 
-              style={[styles.button, styles.speakButton, isLoading && styles.buttonDisabled]}
-              onPress={handleSpeak}
-              disabled={isLoading} 
-            >
-              <Text style={styles.buttonText}>Speak Script</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.button, styles.stopButton]}
-              onPress={handleStopSpeaking}
-            >
-               <Text style={styles.buttonText}>Stop Speaking</Text>
-            </TouchableOpacity>
+      {/* Playback Controls */}
+      {generatedScript && !isLoading && (
+          <View style={styles.playbackControlsContainer}>
+             <TouchableOpacity 
+               style={[styles.button, styles.playButton]} 
+               onPress={handleSpeak} 
+             >
+               <Ionicons name="play" size={24} color={theme.text} />
+             </TouchableOpacity>
+             <TouchableOpacity 
+               style={[styles.button, styles.stopButton]}
+               onPress={handleStopSpeaking}
+             >
+                <Ionicons name="stop" size={24} color={theme.text} />
+             </TouchableOpacity>
           </View>
-        </View>
-      ) : null}
+      )}
+
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   scrollContainer: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    padding: 20,
-    paddingTop: 40, 
-    backgroundColor: '#f0f4f8',
+      flexGrow: 1,
+      alignItems: 'center',
+      justifyContent: 'center', // Center content vertically now
+      padding: 20,
+      // Removed background color here, applied to ScrollView
   },
   title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
-    color: '#333',
+      fontSize: 32, 
+      fontFamily: 'Inter_700Bold',
+      marginBottom: 40, 
+      textAlign: 'center',
+      color: theme.text, 
   },
   input: {
-    height: 50,
-    borderColor: '#d0d0d0',
-    borderWidth: 1,
-    borderRadius: 10,
-    marginBottom: 20,
-    paddingHorizontal: 15,
-    width: '100%',
-    backgroundColor: '#ffffff',
-    fontSize: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2, 
+      height: 55,
+      borderColor: theme.border,
+      borderWidth: 1,
+      borderRadius: 12, 
+      marginBottom: 25, 
+      paddingHorizontal: 20,
+      width: '100%',
+      backgroundColor: theme.card, // Darker input background
+      fontSize: 17,
+      fontFamily: 'Inter_400Regular', // Regular font for input
+      color: theme.text, // White text in input
   },
-  button: {
-    backgroundColor: '#007bff',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
+  button: { // Base button style
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12, 
     alignItems: 'center',
-    width: '80%',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    minHeight: 50, 
+    borderWidth: 1, // Add subtle border
+    borderColor: 'transparent', // Default border is transparent
   },
   buttonText: {
-    color: '#ffffff',
+    color: theme.text,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Inter_600SemiBold', // Use SemiBold for button text
   },
   buttonDisabled: {
-    backgroundColor: '#cccccc',
-    opacity: 0.7,
+    backgroundColor: theme.inactive,
+    opacity: 0.5,
+    borderColor: theme.inactive,
   },
-  speakButton: {
-    backgroundColor: '#28a745',
-    width: '45%',
+  // Specific Button Types
+  generateButton: {
+      backgroundColor: theme.primary, // Accent color
+      borderColor: theme.primary,
+      width: '100%', // Full width
+      marginBottom: 15,
+  },
+  playbackControlsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center', // Center Play/Stop
+      alignItems: 'center',
+      width: '80%', // Controls container width
+      marginTop: 40, 
+  },
+  playButton: {
+    backgroundColor: theme.primary, // Accent for play
+    borderColor: theme.primary,
+    flex: 1, // Take available space
+    marginRight: 10, // Space between play/stop
+    // Remove fixed width
   },
   stopButton: {
-    backgroundColor: '#dc3545',
-    width: '45%',
+    backgroundColor: theme.card, // Use card background for stop
+    borderColor: theme.textSecondary, // Use secondary text for border
+    width: 60, // Make stop button smaller, square-ish
+    paddingHorizontal: 0, // Remove horizontal padding for icon only
   },
-  loader: {
+  loadingText: { 
     marginTop: 20,
+    color: theme.textSecondary,
+    fontSize: 16,
+    fontFamily: 'Inter_400Regular',
   },
   errorText: {
-    color: 'red',
-    marginTop: 10,
+    color: theme.error,
+    marginTop: 15,
     marginBottom: 10,
     textAlign: 'center',
     paddingHorizontal: 10, 
+    fontFamily: 'Inter_400Regular',
   },
   warningText: {
-      color: 'orange',
+      color: theme.warning,
       fontSize: 12,
-      marginTop: 5,
+      marginTop: -5,
       marginBottom: 15,
       textAlign: 'center',
-  },
-  scriptContainer: {
-    marginTop: 30,
-    padding: 20,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  scriptTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
-  },
-  scriptText: {
-    fontSize: 16,
-    lineHeight: 26,
-    marginBottom: 20,
-    color: '#555',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 10,
+      fontFamily: 'Inter_400Regular',
   },
 });
