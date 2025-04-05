@@ -10,11 +10,8 @@ import {
   Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
-const ASYNC_STORAGE_TOPICS_KEY = '@BacklogzApp:topics';
-
-// Define Dark Theme Colors (should match _layout.tsx)
 const theme = {
   background: '#121212',
   card: '#1e1e1e',         
@@ -29,34 +26,29 @@ const theme = {
   stop: '#f44336',         
 };
 
-export default function AddTopicModal() {
-  const [newTopic, setNewTopic] = useState('');
+export default function AddNoteModal() {
+  const [newNote, setNewNote] = useState('');
   const router = useRouter();
+  const { topicName } = useLocalSearchParams<{ topicName: string }>();
 
-  const handleAddTopic = async () => {
-    const topicToAdd = newTopic.trim();
-    if (!topicToAdd) {
-        Alert.alert("Input Error", "Please enter a topic name.");
-        return;
+  const handleAddNote = async () => {
+    const noteToAdd = newNote.trim();
+    if (!noteToAdd) {
+      Alert.alert("Input Error", "Please enter a note.");
+      return;
     }
 
     try {
-      const existingTopicsJson = await AsyncStorage.getItem(ASYNC_STORAGE_TOPICS_KEY);
-      let existingTopics: string[] = existingTopicsJson ? JSON.parse(existingTopicsJson) : [];
+      const notesJson = await AsyncStorage.getItem(`@BacklogzApp:notes:${topicName}`);
+      let existingNotes: string[] = notesJson ? JSON.parse(notesJson) : [];
 
-      if (!existingTopics.some(t => t.toLowerCase() === topicToAdd.toLowerCase())) {
-        existingTopics.push(topicToAdd);
-        existingTopics.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-        
-        await AsyncStorage.setItem(ASYNC_STORAGE_TOPICS_KEY, JSON.stringify(existingTopics));
-        console.log("Topic added:", topicToAdd);
-        router.back(); // Go back to previous screen
-      } else {
-        Alert.alert("Duplicate", `The topic "${topicToAdd}" already exists.`);
-      }
-    } catch (storageError) {
-      console.error("Error saving topic:", storageError);
-      Alert.alert('Error', 'Failed to save the new topic.');
+      existingNotes.push(noteToAdd);
+      await AsyncStorage.setItem(`@BacklogzApp:notes:${topicName}`, JSON.stringify(existingNotes));
+      console.log("Note added:", noteToAdd);
+      router.back(); // Go back to notes list
+    } catch (error) {
+      console.error("Error saving note:", error);
+      Alert.alert('Error', 'Failed to save the note.');
     }
   };
 
@@ -66,32 +58,30 @@ export default function AddTopicModal() {
       style={styles.container}
     >
       <View style={styles.modalView}>
-        <Text style={styles.modalTitle}>Add Topic to Backlog</Text>
+        <Text style={styles.modalTitle}>Add Note</Text>
         <TextInput
           style={styles.modalInput}
-          placeholder="Enter topic name"
+          placeholder="Enter your note"
           placeholderTextColor={theme.textSecondary}
-          value={newTopic}
-          onChangeText={setNewTopic}
+          value={newNote}
+          onChangeText={setNewNote}
           autoFocus={true}
           keyboardAppearance="dark"
+          multiline={true}
+          numberOfLines={4}
         />
         <View style={styles.modalButtonRow}>
-
-          {/* add notes button */}
           <TouchableOpacity 
             style={[styles.modalButton, styles.cancelButton]} 
             onPress={() => router.back()}
           >
             <Text style={styles.modalButtonText}>Cancel</Text>
           </TouchableOpacity>
-
-          {/* delete topic button */}
           <TouchableOpacity 
             style={[styles.modalButton, styles.addButton]} 
-            onPress={handleAddTopic}
+            onPress={handleAddNote}
           >
-            <Text style={styles.modalButtonText}>Add Topic</Text>
+            <Text style={styles.modalButtonText}>Add Note</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -129,7 +119,7 @@ const styles = StyleSheet.create({
     color: theme.text,
   },
   modalInput: {
-    height: 50,
+    minHeight: 100,
     borderColor: theme.border,
     backgroundColor: theme.background,
     color: theme.text,
@@ -137,9 +127,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 30,
     paddingHorizontal: 15,
+    paddingVertical: 10,
     width: '100%',
     fontSize: 16,
     fontFamily: 'Inter_400Regular',
+    textAlignVertical: 'top',
   },
   modalButtonRow: {
     flexDirection: 'row',

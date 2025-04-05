@@ -13,7 +13,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useFonts } from 'expo-font';
 
 const ASYNC_STORAGE_TOPICS_KEY = '@BacklogzApp:topics';
 
@@ -113,7 +112,10 @@ export default function MyTopicsScreen() {
           <TouchableOpacity 
             onPress={() => {
                 console.log(`Notes TouchableOpacity onPress fired for: ${item}`);
-                // Notes logic will be handled later
+                router.push({
+                  pathname: '/(modals)/view-notes',
+                  params: { topicName: item }
+                });
             }}
             style={styles.iconButton}
           >
