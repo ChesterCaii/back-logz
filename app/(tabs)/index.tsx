@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router'; // To reload topics when tab focused
 import { useLocalSearchParams } from 'expo-router'; // Import hook to get params
+import { useRouter } from 'expo-router';
 
 // --- API Key & Constants --- 
 const GEMINI_API_KEY = 'YOUR_API_KEY_HERE'; // Placeholder for push
@@ -44,6 +45,7 @@ export default function QuickPlayScreen() { // Renamed component
   const [error, setError] = useState<string | null>(null);
   const [currentTopic, setCurrentTopic] = useState<string | null>(null);
   const params = useLocalSearchParams<{ topicToPlay?: string }>();
+  const router = useRouter();
 
   // --- Load Topics Function --- 
   const loadTopics = useCallback(async () => {
@@ -189,14 +191,28 @@ export default function QuickPlayScreen() { // Renamed component
         )}
       </TouchableOpacity>
 
-      {/* Show Stop button only while loading/speaking */}      
+      {/* Show Stop button and Notes button while playing */}      
       {isLoading && (
+        <View style={styles.controlsContainer}>
           <TouchableOpacity 
-            style={[styles.stopButton]}
+            style={styles.controlButton}
             onPress={handleStop}
           >
              <Ionicons name="stop" size={24} color={theme.text} />
           </TouchableOpacity>
+          
+          {currentTopic && (
+            <TouchableOpacity 
+              style={styles.controlButton}
+              onPress={() => router.push({
+                pathname: '/(modals)/view-notes',
+                params: { topicName: currentTopic }
+              })}
+            >
+              <Ionicons name="document-text-outline" size={24} color={theme.text} />
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       {/* Display Errors */}      
@@ -251,17 +267,20 @@ const styles = StyleSheet.create({
     backgroundColor: theme.inactive,
     opacity: 0.5,
   },
-  stopButton: {
+  controlsContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 20,
+  },
+  controlButton: {
     backgroundColor: theme.card, 
     borderColor: theme.textSecondary, 
     borderWidth: 1,
-    width: 70, // Smaller stop button
+    width: 70,
     height: 70,
-    borderRadius: 35, // Circular
-    paddingHorizontal: 0, 
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20, // Space above stop button
   },
   errorText: {
     color: theme.error,
