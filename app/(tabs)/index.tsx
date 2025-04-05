@@ -19,9 +19,12 @@ import { Ionicons } from '@expo/vector-icons';
 // import { db } from '../../firebase'; // Comment out Firebase import again
 // import { collection, addDoc, serverTimestamp } from "firebase/firestore"; // Comment out Firestore functions again
 
-// --- Replace key with placeholder for pushing --- 
-const GEMINI_API_KEY = 'AIzaSyBdtbn0RmqhAvDEcQOAxbUod6u0W83CQnU'; 
-// --- --- --- --- --- --- --- --- --- --- ------
+// Import the key from the local config file using alias
+// import { GEMINI_API_KEY } from '@/config'; 
+
+// --- Replace NEW key with placeholder before commit ---
+const GEMINI_API_KEY = 'YOUR_API_KEY_HERE'; 
+// --- --- --- --- --- --- --- --- --- --- -----------
 
 // Use a potentially more current/available model name
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
