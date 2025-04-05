@@ -272,8 +272,8 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     margin: 16,
-    right: 15,
-    bottom: Platform.OS === 'ios' ? 30 : 15,
+    right: 20,
+    bottom: Platform.OS === 'ios' ? 40 : 25,
     backgroundColor: theme.primary,
     width: 60,
     height: 60,
