@@ -42,7 +42,8 @@ export default function QuickPlayScreen() { // Renamed component
   const [isLoading, setIsLoading] = useState(false); // Loading state for generation/speech
   const [topics, setTopics] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const params = useLocalSearchParams<{ topicToPlay?: string }>(); // Get params
+  const [currentTopic, setCurrentTopic] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ topicToPlay?: string }>();
 
   // --- Load Topics Function --- 
   const loadTopics = useCallback(async () => {
@@ -65,6 +66,7 @@ export default function QuickPlayScreen() { // Renamed component
       console.log(`Playing specific topic: ${topic}`);
       console.log('SETTING isLoading = true (playSpecificTopic start)');
       setIsLoading(true);
+      setCurrentTopic(topic);
       
       // Generate Script via Gemini (same logic as random, but with specific topic)
       const prompt = `Generate a short, engaging podcast script (around 200-300 words) about the topic: "${topic}". The tone should be informative yet conversational. If possible, briefly mention 1-2 credible sources related to the topic within the script. Structure it like a mini-podcast segment.`;
@@ -78,24 +80,28 @@ export default function QuickPlayScreen() { // Renamed component
                       onDone: () => {
                            console.log('SETTING isLoading = false (speech onDone)');
                            setIsLoading(false);
+                           setCurrentTopic(null);
                       }, 
                       onError: (err) => { 
                           console.error('Speech error:', err);
                           setError('Failed to play audio for the topic.');
                           console.log('SETTING isLoading = false (speech onError)');
                           setIsLoading(false);
+                          setCurrentTopic(null);
                       }
                   });
               } else {
                   setError('Generated script was empty after cleaning.');
                   console.log('SETTING isLoading = false (empty cleaned script)');
                   setIsLoading(false);
+                  setCurrentTopic(null);
               }
           } else {
               console.error('Invalid response structure from Gemini API:', response.data);
               setError('Failed to parse the generated script.');
               console.log('SETTING isLoading = false (invalid API response)');
               setIsLoading(false);
+              setCurrentTopic(null);
           }
       } catch (err: any) { // API Error
           console.error('Error calling Gemini API for random play:', err);
@@ -106,6 +112,7 @@ export default function QuickPlayScreen() { // Renamed component
           setError(errorMessage);
           console.log('SETTING isLoading = false (API catch block)');
           setIsLoading(false);
+          setCurrentTopic(null);
       }
   }, []); // Dependencies: none needed directly, uses state/constants
 
@@ -153,7 +160,8 @@ export default function QuickPlayScreen() { // Renamed component
       Speech.stop();
       setError(null); 
       console.log('SETTING isLoading = false (handleStop)');
-      setIsLoading(false); 
+      setIsLoading(false);
+      setCurrentTopic(null);
   }
 
   // --- Render --- 
@@ -161,7 +169,12 @@ export default function QuickPlayScreen() { // Renamed component
     // Use View for centering, ScrollView not needed for this layout
     <View style={styles.container}> 
       <Text style={styles.title}>Quick Play</Text>
-      <Text style={styles.subtitle}>Tap below to play a random topic from your backlog</Text>
+      <Text style={styles.subtitle}>
+        {currentTopic 
+          ? `Now playing: ${currentTopic}`
+          : 'Tap below to play a random topic from your backlog'
+        }
+      </Text>
 
       {/* Big Play Button */}      
       <TouchableOpacity 
@@ -215,9 +228,10 @@ const styles = StyleSheet.create({
   subtitle: {
       fontSize: 16, 
       fontFamily: 'Inter_400Regular',
-      marginBottom: 60, // Large space before button
+      marginBottom: 60,
       textAlign: 'center',
-      color: theme.textSecondary, 
+      color: theme.textSecondary,
+      paddingHorizontal: 20,
   },
   playButton: {
     backgroundColor: theme.primary, 
