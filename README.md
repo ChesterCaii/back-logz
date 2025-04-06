@@ -13,7 +13,7 @@
 
 ## Tech Stack
 
-*   **Frontend:** React Native, Expo (SDK 50+ recommended)
+*   **Frontend:** React Native, Expo 
 *   **Language:** TypeScript
 *   **Navigation:** Expo Router (File-based routing)
 *   **AI:** Google Gemini API
