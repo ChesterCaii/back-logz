@@ -23,7 +23,7 @@ import {
 } from "@expo-google-fonts/poppins";
 
 // --- API Key & Constants ---
-const GEMINI_API_KEY = "Your API KEY"; // Placeholder API key
+const GEMINI_API_KEY = "AIzaSyC9ySnOAZai1jYTkSEEKQW_Q1Ef7AD6X_s"; // Placeholder API key
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 const ASYNC_STORAGE_TOPICS_KEY = "@BacklogzApp:topics";
 
