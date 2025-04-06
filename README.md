@@ -94,7 +94,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Resources
 
 *   **GitHub Repository:** https://github.com/ChesterCaii/back-logz
-*   **Demo Video:** [Link to Demo Video - Add if available]
+*    **Demo Video:** [Watch Demo Video](https://youtu.be/-nsNqsaW5cQ?si=xOu7533TUwYYKeHS)
 
 ## Contributing
 
