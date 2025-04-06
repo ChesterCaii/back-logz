@@ -1,7 +1,5 @@
 # Backlogz: AI Audio Note Manager
 
-[![Expo CI](https://github.com/expo/expo/actions/workflows/ci.yml/badge.svg)](https://github.com/expo/expo/actions/workflows/ci.yml)
-
 **Backlogz** is a mobile application developed using React Native and Expo, conceived during the SF Hacks 2025 hackathon. It helps you manage a backlog of topics or ideas and quickly generate listenable AI-powered audio summaries for review.
 
 ## Features
