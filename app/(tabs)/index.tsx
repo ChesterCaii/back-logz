@@ -33,7 +33,7 @@ const theme = {
   card: "#1e1e1e",
   text: "#ffffff",
   textSecondary: "#b0b0b0",
-  primary: "#00bcd4", // Blue (for controls)
+  primary: "#00bcd4",
   inactive: "#757575",
   border: "#272727",
   error: "#cf6679",
@@ -44,6 +44,43 @@ const theme = {
   gradientEnd: "#928dab",
 };
 
+/**
+ * ExploreItem Component
+ * Animates in with a random delay for a dynamic feel.
+ */
+const ExploreItem = ({ item }: { item: string }) => {
+  const animValue = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const delay = Math.random() * 500;
+    Animated.timing(animValue, {
+      toValue: 1,
+      duration: 500,
+      delay,
+      useNativeDriver: true,
+    }).start();
+  }, [animValue]);
+  return (
+    <Animated.View
+      style={[
+        styles.exploreItem,
+        {
+          opacity: animValue,
+          transform: [
+            {
+              translateY: animValue.interpolate({
+                inputRange: [0, 1],
+                outputRange: [20, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <Text style={styles.exploreItemText}>{item}</Text>
+    </Animated.View>
+  );
+};
+
 export default function QuickPlayScreen() {
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -51,52 +88,111 @@ export default function QuickPlayScreen() {
     Poppins_700Bold,
   });
 
-  // State variables
+  // Core state variables
   const [isLoading, setIsLoading] = useState(false);
   const [topics, setTopics] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentTopic, setCurrentTopic] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
-  const [progress, setProgress] = useState(0); // Overall progress (0 to 1)
-  const [estimatedDuration, setEstimatedDuration] = useState(0); // in seconds
+  const [progress, setProgress] = useState(0);
+  const [estimatedDuration, setEstimatedDuration] = useState(0);
   const [transcriptParagraphs, setTranscriptParagraphs] = useState<string[]>(
     []
   );
   const [activeParagraphIndex, setActiveParagraphIndex] = useState(0);
+  const [showTranscript, setShowTranscript] = useState(false);
 
-  // For auto-scrolling container and paragraph measurements
-  const transcriptScrollViewRef = useRef<ScrollView>(null);
+  // For measuring transcript container height & paragraph layouts.
   const [containerHeight, setContainerHeight] = useState(0);
   const [paragraphLayouts, setParagraphLayouts] = useState<
     { y: number; height: number }[]
   >([]);
+  const transcriptScrollViewRef = useRef<ScrollView>(null);
 
   const params = useLocalSearchParams<{ topicToPlay?: string }>();
   const router = useRouter();
 
-  // Animated scale for play button
-  const scaleValue = useRef(new Animated.Value(1)).current;
-  const onPressIn = () => {
-    Animated.spring(scaleValue, {
-      toValue: 0.95,
-      useNativeDriver: true,
-    }).start();
-  };
-  const onPressOut = () => {
-    Animated.spring(scaleValue, {
+  // --- Animated Play Button Setup ---
+  const buttonAnim = useRef(new Animated.Value(0)).current;
+  const scale = buttonAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.9],
+  });
+  const rotate = buttonAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "10deg"],
+  });
+  const handlePressIn = () => {
+    Animated.timing(buttonAnim, {
       toValue: 1,
-      friction: 3,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+  const handlePressOut = () => {
+    Animated.timing(buttonAnim, {
+      toValue: 0,
+      duration: 100,
       useNativeDriver: true,
     }).start();
   };
 
-  // Ref to store the progress timer ID
-  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Pulse (glow) animation for the outer ring.
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+  const pulseScale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.5],
+  });
+  const pulseOpacity = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 0],
+  });
 
-  // --- Start the progress timer ---
+  // Animated value for the transcript pull-up view.
+  const transcriptAnim = useRef(new Animated.Value(0)).current;
+  const maxTranscriptHeight = 120;
+
+  // Toggle transcript visibility with a slight delay.
+  const toggleTranscript = () => {
+    setTimeout(() => {
+      if (showTranscript) {
+        Animated.timing(transcriptAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }).start(() => setShowTranscript(false));
+      } else {
+        setShowTranscript(true);
+        Animated.timing(transcriptAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }).start();
+      }
+    }, 100);
+  };
+
+  // --- Progress Timer ---
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const startProgressTimer = (startingProgress = 0, duration: number) => {
     if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    const interval = 50; // update every 50ms
+    const interval = 50;
     const totalTicks = (duration * 1000) / interval;
     let tickCount = startingProgress * totalTicks;
     progressTimerRef.current = setInterval(() => {
@@ -109,8 +205,6 @@ export default function QuickPlayScreen() {
       }
     }, interval);
   };
-
-  // --- Stop the progress timer ---
   const stopProgressTimer = () => {
     if (progressTimerRef.current) {
       clearInterval(progressTimerRef.current);
@@ -118,7 +212,6 @@ export default function QuickPlayScreen() {
     }
   };
 
-  // --- Set Transcript Paragraphs ---
   const updateTranscriptParagraphs = useCallback((text: string) => {
     const paragraphs = text.includes("\n")
       ? text.split("\n").filter((p) => p.trim().length > 0)
@@ -128,7 +221,6 @@ export default function QuickPlayScreen() {
     setTranscriptParagraphs(paragraphs);
   }, []);
 
-  // --- Compute Active Paragraph Based on Overall Progress ---
   useEffect(() => {
     if (transcriptParagraphs.length === 0) {
       setActiveParagraphIndex(0);
@@ -151,17 +243,17 @@ export default function QuickPlayScreen() {
     setActiveParagraphIndex(index);
   }, [progress, transcriptParagraphs]);
 
-  // --- Auto-Scroll to Active Paragraph using measured layouts ---
+  // Auto-scroll effect (only when transcript is visible)
   useEffect(() => {
+    if (!showTranscript) return;
     if (paragraphLayouts.length === 0 || containerHeight === 0) return;
     if (activeParagraphIndex < paragraphLayouts.length) {
       const { y, height } = paragraphLayouts[activeParagraphIndex];
       const offset = y + height / 2 - containerHeight / 2;
       transcriptScrollViewRef.current?.scrollTo({ y: offset, animated: true });
     }
-  }, [activeParagraphIndex, paragraphLayouts, containerHeight]);
+  }, [activeParagraphIndex, paragraphLayouts, containerHeight, showTranscript]);
 
-  // --- Load Topics Function ---
   const loadTopics = useCallback(async () => {
     console.log("QuickPlay: Loading topics...");
     try {
@@ -174,7 +266,6 @@ export default function QuickPlayScreen() {
     }
   }, []);
 
-  // --- Play Specific Topic ---
   const playSpecificTopic = useCallback(
     async (topic: string) => {
       setError(null);
@@ -186,8 +277,7 @@ export default function QuickPlayScreen() {
       setProgress(0);
       setTranscriptParagraphs([]);
       setParagraphLayouts([]);
-
-      const prompt = `Generate a short, engaging podcast script (around 200-300 words) about the topic: "${topic}". The tone should be informative yet conversational. If possible, briefly mention 1-2 credible sources related to the topic within the script. Structure it like a mini-podcast segment.`;
+      const prompt = `Generate a short, engaging podcast script (around 200-300 words) about the topic: "${topic}". If possible, briefly mention 1-2 credible sources related to the topic. Structure it like a mini-podcast segment.`;
       try {
         const response = await axios.post(
           GEMINI_API_URL,
@@ -202,7 +292,7 @@ export default function QuickPlayScreen() {
             setTranscript(cleanedScript);
             updateTranscriptParagraphs(cleanedScript);
             const totalWords = cleanedScript.split(" ").length;
-            const duration = totalWords / 2.5; // estimated reading time in seconds
+            const duration = totalWords / 2.5;
             setEstimatedDuration(duration);
             startProgressTimer(0, duration);
             Speech.speak(cleanedScript, {
@@ -247,9 +337,8 @@ export default function QuickPlayScreen() {
     [updateTranscriptParagraphs]
   );
 
-  // --- Play Random Logic ---
   const handlePlayRandom = async () => {
-    if (isLoading) return; // Prevent starting a new podcast if one is already running
+    if (isLoading) return;
     setError(null);
     Speech.stop();
     stopProgressTimer();
@@ -263,14 +352,17 @@ export default function QuickPlayScreen() {
     playSpecificTopic(randomTopic);
   };
 
-  // --- Stop Speech Handler ---
   const handleStop = () => {
     Speech.stop();
     stopProgressTimer();
     setError(null);
-    console.log("Stopping speech and resetting state");
     setIsLoading(false);
     setCurrentTopic(null);
+    setTranscript("");
+    setTranscriptParagraphs([]);
+    setActiveParagraphIndex(0);
+    setShowTranscript(false);
+    console.log("Speech stopped and state reset.");
   };
 
   useEffect(() => {
@@ -295,7 +387,6 @@ export default function QuickPlayScreen() {
     );
   }
 
-  // Render transcript paragraphs (all in white)
   const renderTranscriptParagraphs = () => {
     return transcriptParagraphs.map((para, index) => (
       <Text
@@ -315,6 +406,11 @@ export default function QuickPlayScreen() {
     ));
   };
 
+  const transcriptHeightInterpolate = transcriptAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, maxTranscriptHeight],
+  });
+
   return (
     <LinearGradient
       colors={[theme.gradientStart, theme.gradientEnd]}
@@ -328,29 +424,42 @@ export default function QuickPlayScreen() {
             : "Tap below to spark a random podcast script from your backlog"}
         </Text>
 
-        {/* Animated Play Button */}
-        <Animated.View
-          style={[
-            styles.playButtonContainer,
-            { transform: [{ scale: scaleValue }] },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.playButton, isLoading && styles.buttonDisabled]}
-            onPressIn={onPressIn}
-            onPressOut={onPressOut}
-            onPress={handlePlayRandom}
-            disabled={isLoading}
+        {/* Modern Animated Play Button with Pulse Effect */}
+        <View style={styles.animatedButtonWrapper}>
+          <Animated.View
+            style={[
+              styles.pulseRing,
+              { transform: [{ scale: pulseScale }], opacity: pulseOpacity },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.animatedButtonContainer,
+              { transform: [{ scale }, { rotate }] },
+            ]}
           >
-            {isLoading ? (
-              <ActivityIndicator size="large" color={theme.text} />
-            ) : (
-              <Ionicons name="play" size={60} color={theme.text} />
-            )}
-          </TouchableOpacity>
-        </Animated.View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              onPress={handlePlayRandom}
+              disabled={isLoading}
+            >
+              <LinearGradient
+                colors={[theme.primary, theme.success]}
+                style={styles.playButton}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="large" color={theme.text} />
+                ) : (
+                  <Ionicons name="play" size={60} color={theme.text} />
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
 
-        {/* Control: Stop Button */}
+        {/* Control Buttons */}
         {isLoading && (
           <View style={styles.controlsContainer}>
             <TouchableOpacity style={styles.controlButton} onPress={handleStop}>
@@ -376,19 +485,46 @@ export default function QuickPlayScreen() {
           </View>
         )}
 
-        {/* Transcript Container */}
-        {transcript ? (
-          <ScrollView
-            style={styles.transcriptContainer}
-            ref={transcriptScrollViewRef}
+        {/* Transcript Toggle Bar */}
+        {transcript && (
+          <TouchableOpacity onPress={() => setTimeout(toggleTranscript, 100)}>
+            <View style={styles.transcriptToggleBar}>
+              <Text style={styles.transcriptToggleText}>
+                {showTranscript ? "Hide Transcript" : "See Transcript"}
+              </Text>
+              <Ionicons
+                name={showTranscript ? "chevron-down" : "chevron-up"}
+                size={24}
+                color={theme.text}
+              />
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Animated Transcript Container */}
+        {transcript && (
+          <Animated.View
+            style={[
+              styles.transcriptContainer,
+              {
+                height: transcriptHeightInterpolate,
+                overflow: "hidden",
+                opacity: transcriptHeightInterpolate.interpolate({
+                  inputRange: [0, maxTranscriptHeight],
+                  outputRange: [0, 1],
+                }),
+              },
+            ]}
             onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
           >
-            {renderTranscriptParagraphs()}
-          </ScrollView>
-        ) : null}
+            <ScrollView ref={transcriptScrollViewRef}>
+              {renderTranscriptParagraphs()}
+            </ScrollView>
+          </Animated.View>
+        )}
 
-        {/* Progress Slider (visual simulation only) */}
-        {transcript ? (
+        {/* Progress Slider */}
+        {transcript && (
           <View style={styles.sliderContainer}>
             <Slider
               style={styles.slider}
@@ -404,7 +540,7 @@ export default function QuickPlayScreen() {
               {Math.round(estimatedDuration)}s
             </Text>
           </View>
-        ) : null}
+        )}
 
         {/* Display Errors */}
         {error && <Text style={styles.errorText}>{error}</Text>}
@@ -417,9 +553,7 @@ export default function QuickPlayScreen() {
 }
 
 const styles = StyleSheet.create({
-  gradientContainer: {
-    flex: 1,
-  },
+  gradientContainer: { flex: 1 },
   container: {
     flex: 1,
     alignItems: "center",
@@ -442,25 +576,30 @@ const styles = StyleSheet.create({
     color: theme.textSecondary,
     paddingHorizontal: 20,
   },
-  playButtonContainer: {
+  animatedButtonWrapper: {
     marginBottom: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  playButton: {
+  pulseRing: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     backgroundColor: theme.primary,
+  },
+  animatedButtonContainer: { zIndex: 1 },
+  playButton: {
     width: 150,
     height: 150,
     borderRadius: 75,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
-  buttonDisabled: {
-    backgroundColor: theme.inactive,
-    opacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
   },
   controlsContainer: {
     flexDirection: "row",
@@ -477,13 +616,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  transcriptContainer: {
+  transcriptToggleBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.card,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 25,
     marginTop: 20,
+  },
+  transcriptToggleText: {
+    fontFamily: "Poppins_400Regular",
+    fontSize: 16,
+    color: theme.text,
+    marginRight: 8,
+  },
+  transcriptContainer: {
+    marginTop: 10,
     padding: 10,
     backgroundColor: theme.card,
     borderRadius: 10,
     width: "100%",
-    maxHeight: 200,
   },
   transcriptParagraph: {
     fontFamily: "Poppins_400Regular",
@@ -494,15 +648,40 @@ const styles = StyleSheet.create({
     color: theme.text,
     paddingHorizontal: 8,
   },
+  exploreOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    zIndex: 11,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  exploreScroll: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+  },
+  exploreItem: {
+    backgroundColor: theme.success,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  exploreItemText: {
+    fontFamily: "Poppins_400Regular",
+    fontSize: 14,
+    color: theme.text,
+  },
   sliderContainer: {
     width: "100%",
     marginTop: 20,
     alignItems: "center",
   },
-  slider: {
-    width: "100%",
-    height: 40,
-  },
+  slider: { width: "100%", height: 40 },
   progressText: {
     color: theme.textSecondary,
     fontFamily: "Poppins_400Regular",
