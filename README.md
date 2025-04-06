@@ -27,7 +27,7 @@ Managing and reviewing a growing backlog of ideas, articles, or notes can be ove
 
 ## Architecture
 
-![Backlogz System Architecture Diagram](assets/diagram.png)
+<img src="assets/diagram.png" alt="Backlogz System Architecture Diagram" width="600">
 
 ## Getting Started
 
