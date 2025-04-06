@@ -24,7 +24,7 @@ import {
 } from "@expo-google-fonts/poppins";
 
 // --- API Key & Constants ---
-const GEMINI_API_KEY = "API KEYS"; // Replace with your actual API key
+const GEMINI_API_KEY = "API KEY";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 const ASYNC_STORAGE_TOPICS_KEY = "@BacklogzApp:topics";
 
@@ -241,6 +241,9 @@ const Recommendations = ({
  *
  * Generates a podcast transcript, plays it with expo-speech, shows transcript and recommendations.
  * When a recommendation appears, the transcript auto-scrolls to the paragraph that mentions it.
+ * The big animated button toggles between starting and stopping the podcast.
+ * A round icon button in the controls container allows you to access the notes view.
+ * The transcript toggle and notes button are now combined in a single horizontal container.
  */
 export default function QuickPlayScreen() {
   // Load fonts
@@ -276,7 +279,7 @@ export default function QuickPlayScreen() {
   const params = useLocalSearchParams<{ topicToPlay?: string }>();
   const router = useRouter();
 
-  // --- Animated Play Button Setup ---
+  // --- Animated Play/Stop Button Setup ---
   const buttonAnim = useRef(new Animated.Value(0)).current;
   const scale = buttonAnim.interpolate({
     inputRange: [0, 1],
@@ -535,6 +538,15 @@ export default function QuickPlayScreen() {
     playSpecificTopic(randomTopic);
   };
 
+  // Big button now toggles: if a podcast is playing, stop it; otherwise, start a random one.
+  const handleTogglePlay = () => {
+    if (isLoading) {
+      handleStop();
+    } else {
+      handlePlayRandom();
+    }
+  };
+
   const handleStop = () => {
     Speech.stop();
     stopProgressTimer();
@@ -610,7 +622,7 @@ export default function QuickPlayScreen() {
             : "Tap below to spark a random podcast script from your backlog"}
         </Text>
 
-        {/* Modern Animated Play Button with Pulse Effect */}
+        {/* Big Animated Button used for both play and stop */}
         <View style={styles.animatedButtonWrapper}>
           <Animated.View
             style={[
@@ -628,15 +640,14 @@ export default function QuickPlayScreen() {
               activeOpacity={0.8}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
-              onPress={handlePlayRandom}
-              disabled={isLoading}
+              onPress={handleTogglePlay}
             >
               <LinearGradient
                 colors={[theme.primary, theme.success]}
                 style={styles.playButton}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="large" color={theme.text} />
+                  <Ionicons name="stop" size={60} color={theme.text} />
                 ) : (
                   <Ionicons name="play" size={60} color={theme.text} />
                 )}
@@ -645,15 +656,25 @@ export default function QuickPlayScreen() {
           </Animated.View>
         </View>
 
-        {/* Control Buttons */}
-        {isLoading && (
-          <View style={styles.controlsContainer}>
-            <TouchableOpacity style={styles.controlButton} onPress={handleStop}>
-              <Ionicons name="stop" size={24} color={theme.text} />
+        {/* Combined Transcript Toggle & Notes Bar */}
+        {transcript && (
+          <View style={styles.bottomBar}>
+            <TouchableOpacity
+              style={styles.bottomBarButton}
+              onPress={() => setTimeout(toggleTranscript, 100)}
+            >
+              <Text style={styles.bottomBarText}>
+                {showTranscript ? "Hide Transcript" : "View Transcript"}
+              </Text>
+              <Ionicons
+                name={showTranscript ? "chevron-down" : "chevron-up"}
+                size={24}
+                color={theme.text}
+              />
             </TouchableOpacity>
             {currentTopic && (
               <TouchableOpacity
-                style={styles.controlButton}
+                style={styles.bottomBarButton}
                 onPress={() =>
                   router.push({
                     pathname: "/(modals)/view-notes",
@@ -666,25 +687,10 @@ export default function QuickPlayScreen() {
                   size={24}
                   color={theme.text}
                 />
+                <Text style={styles.bottomBarText}>Notes</Text>
               </TouchableOpacity>
             )}
           </View>
-        )}
-
-        {/* Transcript Toggle Bar */}
-        {transcript && (
-          <TouchableOpacity onPress={() => setTimeout(toggleTranscript, 100)}>
-            <View style={styles.transcriptToggleBar}>
-              <Text style={styles.transcriptToggleText}>
-                {showTranscript ? "Hide Transcript" : "See Transcript"}
-              </Text>
-              <Ionicons
-                name={showTranscript ? "chevron-down" : "chevron-up"}
-                size={24}
-                color={theme.text}
-              />
-            </View>
-          </TouchableOpacity>
         )}
 
         {/* Animated Transcript Container */}
@@ -709,7 +715,7 @@ export default function QuickPlayScreen() {
           </Animated.View>
         )}
 
-        {/* Progress Slider */}
+        {/* Progress Slider (Reduced margin-top) */}
         {transcript && (
           <View style={styles.sliderContainer}>
             <Slider
@@ -797,8 +803,7 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     flexDirection: "row",
-    gap: 16,
-    marginTop: 20,
+    marginBottom: 20,
   },
   controlButton: {
     backgroundColor: theme.card,
@@ -809,6 +814,26 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     justifyContent: "center",
     alignItems: "center",
+  },
+  bottomBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    marginVertical: 10,
+  },
+  bottomBarButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.card,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 25,
+  },
+  bottomBarText: {
+    fontFamily: "Poppins_400Regular",
+    fontSize: 16,
+    color: theme.text,
+    marginLeft: 6,
   },
   transcriptToggleBar: {
     flexDirection: "row",
@@ -848,7 +873,7 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     width: "100%",
-    marginTop: 20,
+    marginTop: 10,
     alignItems: "center",
   },
   slider: { width: "100%", height: 40 },
@@ -927,25 +952,5 @@ const styles = StyleSheet.create({
     color: theme.textSecondary,
     fontSize: 14,
     fontFamily: "Poppins_400Regular",
-  },
-  bottomActionsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    width: "100%",
-    marginTop: 20,
-  },
-  bottomActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    backgroundColor: theme.card,
-    borderRadius: 8,
-  },
-  bottomActionText: {
-    marginLeft: 8,
-    fontFamily: "Poppins_400Regular",
-    fontSize: 16,
-    color: theme.text,
   },
 });
