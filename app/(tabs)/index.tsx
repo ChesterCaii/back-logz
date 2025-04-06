@@ -8,6 +8,7 @@ import {
   Animated,
   ScrollView,
   LayoutChangeEvent,
+  Alert,
 } from "react-native";
 import * as Speech from "expo-speech";
 import axios from "axios";
@@ -23,7 +24,7 @@ import {
 } from "@expo-google-fonts/poppins";
 
 // --- API Key & Constants ---
-const GEMINI_API_KEY = "Your API KEY"; // Placeholder API key
+const GEMINI_API_KEY = "API KEYS"; // Replace with your actual API key
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 const ASYNC_STORAGE_TOPICS_KEY = "@BacklogzApp:topics";
 
@@ -45,42 +46,202 @@ const theme = {
 };
 
 /**
- * ExploreItem Component
- * Animates in with a random delay for a dynamic feel.
+ * Helper function to extract key topics from a transcript.
+ * It sends a prompt to Gemini asking for key topics as a comma-separated list.
  */
-const ExploreItem = ({ item }: { item: string }) => {
-  const animValue = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const delay = Math.random() * 500;
-    Animated.timing(animValue, {
-      toValue: 1,
-      duration: 500,
-      delay,
+const getKeyTopicsFromTranscript = async (
+  transcript: string
+): Promise<string[]> => {
+  const prompt = `Extract the key topics from the following transcript. Return them as a comma-separated list. Transcript: "${transcript}"`;
+  try {
+    const response = await axios.post(
+      GEMINI_API_URL,
+      { contents: [{ parts: [{ text: prompt }] }] },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    const topicsText =
+      response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (topicsText) {
+      // Assumes topics are comma-separated.
+      const topics = topicsText
+        .split(",")
+        .map((t: string) => t.trim())
+        .filter((t: string) => t.length > 0);
+      return topics;
+    } else {
+      console.error("No topics were returned from Gemini.");
+      return [];
+    }
+  } catch (error) {
+    console.error("Error extracting topics from transcript:", error);
+    return [];
+  }
+};
+
+/**
+ * A small component to render each recommendation with a press animation.
+ */
+const RecommendationBox = ({
+  topic,
+  onPress,
+}: {
+  topic: string;
+  onPress: (topic: string) => void;
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
       useNativeDriver: true,
     }).start();
-  }, [animValue]);
+  };
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
   return (
     <Animated.View
-      style={[
-        styles.exploreItem,
-        {
-          opacity: animValue,
-          transform: [
-            {
-              translateY: animValue.interpolate({
-                inputRange: [0, 1],
-                outputRange: [20, 0],
-              }),
-            },
-          ],
-        },
-      ]}
+      style={[styles.recommendationBox, { transform: [{ scale: scaleAnim }] }]}
     >
-      <Text style={styles.exploreItemText}>{item}</Text>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={() => onPress(topic)}
+      >
+        <Text style={styles.recommendationText}>{topic}</Text>
+      </TouchableOpacity>
     </Animated.View>
   );
 };
 
+/**
+ * Recommendations Component
+ *
+ * Displays one recommendation box at a time, containing a key topic.
+ * A timer (default 10 seconds) counts down—if no selection is made, the recommendation auto-advances.
+ * When a topic is selected, it is saved to AsyncStorage and the next recommendation is displayed.
+ * It also calls onAlignRecommendation to align the transcript view.
+ */
+interface RecommendationsProps {
+  transcript: string;
+  onAlignRecommendation?: (topic: string) => void;
+}
+
+const Recommendations = ({
+  transcript,
+  onAlignRecommendation,
+}: RecommendationsProps) => {
+  const [allTopics, setAllTopics] = useState<string[]>([]);
+  const [currentRecommendation, setCurrentRecommendation] = useState<
+    string | null
+  >(null);
+  const [timer, setTimer] = useState<number>(10); // Timer in seconds
+
+  // Save the selected topic to AsyncStorage
+  const saveTopic = async (topic: string) => {
+    try {
+      const currentTopicsJson = await AsyncStorage.getItem(
+        ASYNC_STORAGE_TOPICS_KEY
+      );
+      const currentTopics = currentTopicsJson
+        ? JSON.parse(currentTopicsJson)
+        : [];
+      const updatedTopics = [...currentTopics, topic];
+      await AsyncStorage.setItem(
+        ASYNC_STORAGE_TOPICS_KEY,
+        JSON.stringify(updatedTopics)
+      );
+      console.log("Saved topic:", topic);
+    } catch (error) {
+      console.error("Error saving topic:", error);
+    }
+  };
+
+  // Load key topics from the transcript using the helper function
+  const loadKeyTopics = useCallback(async () => {
+    const topics = await getKeyTopicsFromTranscript(transcript);
+    setAllTopics(topics);
+  }, [transcript]);
+
+  // When a new transcript is received, extract topics.
+  useEffect(() => {
+    if (transcript) {
+      loadKeyTopics();
+    }
+  }, [transcript, loadKeyTopics]);
+
+  // Function to load the next recommendation
+  const nextRecommendation = () => {
+    if (allTopics.length > 0) {
+      const next = allTopics[0];
+      setCurrentRecommendation(next);
+      setAllTopics((prev) => prev.slice(1));
+      setTimer(10);
+      if (onAlignRecommendation) {
+        onAlignRecommendation(next);
+      }
+    } else {
+      setCurrentRecommendation(null);
+    }
+  };
+
+  // When allTopics is updated and no recommendation is showing, show the next one.
+  useEffect(() => {
+    if (transcript && !currentRecommendation && allTopics.length > 0) {
+      nextRecommendation();
+    }
+  }, [allTopics, currentRecommendation, transcript]);
+
+  // Timer for auto-advancing if no selection is made
+  useEffect(() => {
+    if (!currentRecommendation) return;
+    if (timer <= 0) {
+      nextRecommendation();
+      return;
+    }
+    const interval = setInterval(() => {
+      setTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timer, currentRecommendation]);
+
+  const handleSelect = (topic: string) => {
+    saveTopic(topic);
+    nextRecommendation();
+  };
+
+  return (
+    <View style={styles.recommendationsContainer}>
+      {currentRecommendation ? (
+        <>
+          <Text style={styles.timerText}>
+            You might also like ({timer}s remaining):
+          </Text>
+          <View style={styles.singleBoxContainer}>
+            <RecommendationBox
+              topic={currentRecommendation}
+              onPress={handleSelect}
+            />
+          </View>
+        </>
+      ) : (
+        <Text style={styles.noRecommendationText}>
+          No more recommendations.
+        </Text>
+      )}
+    </View>
+  );
+};
+
+/**
+ * Main Component: QuickPlayScreen
+ *
+ * Generates a podcast transcript, plays it with expo-speech, shows transcript and recommendations.
+ * When a recommendation appears, the transcript auto-scrolls to the paragraph that mentions it.
+ */
 export default function QuickPlayScreen() {
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -101,6 +262,9 @@ export default function QuickPlayScreen() {
   );
   const [activeParagraphIndex, setActiveParagraphIndex] = useState(0);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [highlightedParagraphIndex, setHighlightedParagraphIndex] = useState<
+    number | null
+  >(null);
 
   // For measuring transcript container height & paragraph layouts.
   const [containerHeight, setContainerHeight] = useState(0);
@@ -254,6 +418,25 @@ export default function QuickPlayScreen() {
     }
   }, [activeParagraphIndex, paragraphLayouts, containerHeight, showTranscript]);
 
+  // Function to align transcript with a recommended topic.
+  const scrollToTopic = (topic: string) => {
+    const lowerTopic = topic.toLowerCase();
+    const index = transcriptParagraphs.findIndex((para) =>
+      para.toLowerCase().includes(lowerTopic)
+    );
+    if (index !== -1 && transcriptScrollViewRef.current) {
+      const layout = paragraphLayouts[index];
+      if (layout) {
+        transcriptScrollViewRef.current.scrollTo({
+          y: layout.y,
+          animated: true,
+        });
+      }
+      setHighlightedParagraphIndex(index);
+      setTimeout(() => setHighlightedParagraphIndex(null), 3000);
+    }
+  };
+
   const loadTopics = useCallback(async () => {
     console.log("QuickPlay: Loading topics...");
     try {
@@ -276,7 +459,7 @@ export default function QuickPlayScreen() {
       setTranscript("");
       setProgress(0);
       setTranscriptParagraphs([]);
-      setParagraphLayouts([]);
+      // Prompt for generating a podcast script
       const prompt = `Generate a short, engaging podcast script (around 200-300 words) about the topic: "${topic}". If possible, briefly mention 1-2 credible sources related to the topic. Structure it like a mini-podcast segment.`;
       try {
         const response = await axios.post(
@@ -391,7 +574,10 @@ export default function QuickPlayScreen() {
     return transcriptParagraphs.map((para, index) => (
       <Text
         key={index}
-        style={styles.transcriptParagraph}
+        style={[
+          styles.transcriptParagraph,
+          highlightedParagraphIndex === index && styles.highlightedParagraph,
+        ]}
         onLayout={(event: LayoutChangeEvent) => {
           const { y, height } = event.nativeEvent.layout;
           setParagraphLayouts((prev) => {
@@ -547,6 +733,14 @@ export default function QuickPlayScreen() {
         {!GEMINI_API_KEY && (
           <Text style={styles.warningText}>API Key Missing!</Text>
         )}
+
+        {/* Recommendations Section */}
+        {transcript && (
+          <Recommendations
+            transcript={transcript}
+            onAlignRecommendation={scrollToTopic}
+          />
+        )}
       </View>
     </LinearGradient>
   );
@@ -648,33 +842,9 @@ const styles = StyleSheet.create({
     color: theme.text,
     paddingHorizontal: 8,
   },
-  exploreOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 20,
-    right: 20,
-    flexDirection: "row",
-    zIndex: 11,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  exploreScroll: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-  },
-  exploreItem: {
-    backgroundColor: theme.success,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  exploreItemText: {
-    fontFamily: "Poppins_400Regular",
-    fontSize: 14,
-    color: theme.text,
+  highlightedParagraph: {
+    backgroundColor: "rgba(0,188,212,0.2)",
+    borderRadius: 5,
   },
   sliderContainer: {
     width: "100%",
@@ -702,5 +872,80 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_400Regular",
     position: "absolute",
     bottom: 20,
+  },
+  recommendationsContainer: {
+    padding: 15,
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    marginVertical: 10,
+    width: "100%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  timerText: {
+    color: theme.text,
+    marginBottom: 8,
+    fontSize: 16,
+    fontFamily: "Poppins_400Regular",
+  },
+  boxesContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  singleBoxContainer: {
+    width: "100%",
+    alignItems: "center",
+  },
+  recommendationBox: {
+    backgroundColor: theme.primary,
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    marginVertical: 5,
+    width: "90%",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  recommendationText: {
+    color: theme.text,
+    fontWeight: "bold",
+    fontSize: 15,
+    textAlign: "center",
+    fontFamily: "Poppins_700Bold",
+  },
+  noRecommendationText: {
+    color: theme.textSecondary,
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+  },
+  bottomActionsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    width: "100%",
+    marginTop: 20,
+  },
+  bottomActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    backgroundColor: theme.card,
+    borderRadius: 8,
+  },
+  bottomActionText: {
+    marginLeft: 8,
+    fontFamily: "Poppins_400Regular",
+    fontSize: 16,
+    color: theme.text,
   },
 });
