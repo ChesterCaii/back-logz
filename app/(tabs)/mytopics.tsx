@@ -145,33 +145,32 @@ export default function MyTopicsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Text style={styles.title}>Backlog</Text>
+    <SafeAreaView style={[styles.safeArea, { paddingTop: Platform.OS === "android" ? 25 : 0 }]}>
       <FlatList
-        data={topics}
-        renderItem={renderTopicItem}
-        keyExtractor={(item) => item}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>Your topic backlog is empty.</Text>
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[theme.primary]}
-            tintColor={theme.primary}
-            progressBackgroundColor={theme.card}
-          />
-        }
+      data={topics}
+      renderItem={renderTopicItem}
+      keyExtractor={(item) => item}
+      style={styles.list}
+      contentContainerStyle={styles.listContent}
+      ListEmptyComponent={
+        <Text style={styles.emptyText}>Your topic backlog is empty.</Text>
+      }
+      refreshControl={
+        <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        colors={[theme.primary]}
+        tintColor={theme.primary}
+        progressBackgroundColor={theme.card}
+        />
+      }
       />
 
       <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push("/(modals)/add-topic")}
+      style={styles.fab}
+      onPress={() => router.push("/(modals)/add-topic")}
       >
-        <Ionicons name="add" size={30} color={theme.text} />
+      <Ionicons name="add" size={30} color={theme.text} />
       </TouchableOpacity>
     </SafeAreaView>
   );

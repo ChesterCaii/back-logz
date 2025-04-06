@@ -91,12 +91,6 @@ export default function ViewNotesModal() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Notes for {topicName}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-          <Ionicons name="close" size={24} color={theme.text} />
-        </TouchableOpacity>
-      </View>
 
       <FlatList
         data={notes}
