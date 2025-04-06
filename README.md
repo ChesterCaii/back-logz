@@ -23,6 +23,14 @@
 *   **Local Storage:** AsyncStorage (for topic list)
 *   **(Potential):** Firebase (for cloud storage/other features)
 
+## Problem Statement
+
+Managing and reviewing a growing backlog of ideas, articles, or notes can be overwhelming and time-consuming. It's easy for valuable thoughts to get lost. Backlogz addresses this by transforming static text entries into easily digestible AI-generated audio summaries, making review effortless and passive.
+
+## Architecture
+
+![Backlogz System Architecture Diagram](assets/diagram.png)
+
 ## Getting Started
 
 ### Prerequisites
@@ -67,6 +75,32 @@
 1.  **Add Topics:** Navigate to the "My Topics" (or similarly named) tab. Use the interface provided to add the topics or ideas you want to keep track of.
 2.  **Quick Play:** Go to the "Quick Play" tab. Tap the large play button to have the app randomly select a topic from your list, generate an audio summary using Gemini, and play it back using Text-to-Speech.
 3.  **Stop Playback:** While playing, a stop button will appear if you wish to interrupt the audio.
+
+## Future Development Roadmap
+
+### Short-term (Next Steps)
+*   **Notes Feature:** Implement functionality to add, view, and edit detailed notes associated with each topic.
+*   **Cloud Storage/Sync:** Explore integrating Firebase (or another cloud solution) for backing up topics and potentially enabling cross-device synchronization.
+*   **Improved Error Handling:** Enhance feedback for API errors or speech generation issues.
+*   **Configuration:** Allow users to configure voice/speed for Text-to-Speech.
+
+### Medium-term
+*   **User Accounts:** Implement user authentication for personalized backlogs.
+*   **Topic Organization:** Add features like tagging or categorization for topics.
+*   **Web Interface:** Consider a web-based version for managing topics.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. (Ensure a LICENSE file exists in the repo).
+
+## Resources
+
+*   **GitHub Repository:** https://github.com/ChesterCaii/back-logz
+*   **Demo Video:** [Link to Demo Video - Add if available]
+
+## Contributing
+
+Contributions are welcome! Please feel free to fork the repository, make your changes, and submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 ## Acknowledgements
 
