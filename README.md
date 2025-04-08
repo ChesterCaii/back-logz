@@ -1,6 +1,8 @@
 # Backlogz: AI Audio Note Manager
 
 **Backlogz** is a mobile application developed using React Native and Expo, conceived during the SF Hacks 2025 hackathon. It helps you manage a backlog of topics or ideas and quickly generate listenable AI-powered audio summaries for review.
+- [Demo Video](https://youtu.be/-nsNqsaW5cQ?si=xOu7533TUwYYKeHS)
+- [Shorter Demo Video](https://youtu.be/-nsNqsaW5cQ?si=xOu7533TUwYYKeHS)
 
 ## Features
 
@@ -90,12 +92,6 @@ Managing and reviewing a growing backlog of ideas, articles, or notes can be ove
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details. (Ensure a LICENSE file exists in the repo).
-
-## Resources
-
-*    **GitHub Repository:** https://github.com/ChesterCaii/back-logz
-*    **Demo Video:** [Watch Demo Video](https://youtu.be/-nsNqsaW5cQ?si=xOu7533TUwYYKeHS)
-*    **Short Demo Video:** [Watch Demo Video](https://youtu.be/-nsNqsaW5cQ?si=xOu7533TUwYYKeHS)
 
 ## Contributing
 
